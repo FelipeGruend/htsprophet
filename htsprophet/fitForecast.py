@@ -26,7 +26,7 @@ def fitForecast(y, h, sumMat, nodes, method, freq, include_history, cap, capF, c
                 yearly_seasonality, weekly_seasonality, daily_seasonality, holidays, seasonality_prior_scale, \
                 holidays_prior_scale, changepoint_prior_scale, mcmc_samples, interval_width, uncertainty_samples, \
                 boxcoxT, skipFitting):
-   
+
     forecastsDict = {}
     mse = {}
     resids = {}
@@ -38,12 +38,12 @@ def fitForecast(y, h, sumMat, nodes, method, freq, include_history, cap, capF, c
         for key in range(len(y.columns.tolist())-1):
             forecastsDict[key] = pd.DataFrame(y.iloc[:,key+1])
             forecastsDict[key] = forecastsDict[key].rename(columns = {forecastsDict[key].columns[0] : 'yhat'})
-            
+
     if skipFitting == False:
-        
+
         if method == 'FP':
             nForecasts = sum(list(map(sum, nodes)))+1
-        
+
         for node in range(nForecasts):
             nodeToForecast = pd.concat([y.iloc[:, [0]], y.iloc[:, node+1]], axis = 1)
             if isinstance(cap, pd.DataFrame):
@@ -71,12 +71,34 @@ def fitForecast(y, h, sumMat, nodes, method, freq, include_history, cap, capF, c
                 nodeToForecast = nodeToForecast.rename(columns = {nodeToForecast.columns[1] : 'y'})
                 if capF is None:
                     growth = 'linear'
-                    m = Prophet(growth, changepoints1, n_changepoints1, yearly_seasonality, weekly_seasonality, daily_seasonality, holidays, seasonality_prior_scale, \
-                                holidays_prior_scale, changepoint_prior_scale, mcmc_samples, interval_width, uncertainty_samples)
+                    m = Prophet(growth=growth,
+                                changepoints=changepoints1,
+                                n_changepoints=n_changepoints1,
+                                yearly_seasonality=yearly_seasonality,
+                                weekly_seasonality=weekly_seasonality,
+                                daily_seasonality=daily_seasonality,
+                                holidays=holidays,
+                                seasonality_prior_scale=seasonality_prior_scale,
+                                holidays_prior_scale=holidays_prior_scale,
+                                changepoint_prior_scale=changepoint_prior_scale,
+                                mcmc_samples=mcmc_samples,
+                                interval_width=interval_width,
+                                uncertainty_samples=uncertainty_samples)
                 else:
                     growth = 'logistic'
-                    m = Prophet(growth, changepoints, n_changepoints, yearly_seasonality, weekly_seasonality, daily_seasonality, holidays, seasonality_prior_scale, \
-                                holidays_prior_scale, changepoint_prior_scale, mcmc_samples, interval_width, uncertainty_samples)
+                    m = Prophet(growth=growth,
+                                changepoints=changepoints,
+                                n_changepoints=n_changepoints,
+                                yearly_seasonality=yearly_seasonality,
+                                weekly_seasonality=weekly_seasonality,
+                                daily_seasonality=daily_seasonality,
+                                holidays=holidays,
+                                seasonality_prior_scale=seasonality_prior_scale,
+                                holidays_prior_scale=holidays_prior_scale,
+                                changepoint_prior_scale=changepoint_prior_scale,
+                                mcmc_samples=mcmc_samples,
+                                interval_width=interval_width,
+                                uncertainty_samples=uncertainty_samples)
                     nodeToForecast['cap'] = cap1
                 m.fit(nodeToForecast)
                 future = m.make_future_dataframe(periods = h, freq = freq, include_history = include_history)
@@ -127,7 +149,7 @@ def fitForecast(y, h, sumMat, nodes, method, freq, include_history, cap, capF, c
                     hatMat = f2
                 else:
                     hatMat = np.concatenate((hatMat, f2), axis = 1)
-            
+
         if method == 'AHP':
             '''
              Pros:
@@ -149,7 +171,7 @@ def fitForecast(y, h, sumMat, nodes, method, freq, include_history, cap, capF, c
             props = divs.mean(1)
             props = props[:, np.newaxis]
             hatMat = np.dot(np.array(fcst),np.transpose(props))
-            
+
         if method == 'PHA':
             '''
              Pros:
@@ -172,18 +194,18 @@ def fitForecast(y, h, sumMat, nodes, method, freq, include_history, cap, capF, c
             props = btsSum/topSum
             props = props[:, np.newaxis]
             hatMat = np.dot(np.array(fcst),np.transpose(props))
-        
+
         newMat = np.empty([hatMat.shape[0],sumMat.shape[0]])
         for i in range(hatMat.shape[0]):
             newMat[i,:] = np.dot(sumMat, np.transpose(hatMat[i,:]))
-            
+
     if method == 'FP':
         newMat = forecastProp(forecastsDict, nodes)
     if method == 'OLS' or method == 'WLSS' or method == 'WLSV':
         if capF is not None:
             print("An error might occur because of how these methods are defined (They can produce negative values). If it does, then please use another method")
         newMat = optimalComb(forecastsDict, sumMat, method, mse)
-    
+
     for key in forecastsDict.keys():
         values = forecastsDict[key].yhat.values
         values = newMat[:,key]
@@ -193,9 +215,9 @@ def fitForecast(y, h, sumMat, nodes, method, freq, include_history, cap, capF, c
         ##
         if capF is not None:
             forecastsDict[key].yhat = np.log(forecastsDict[key].yhat)
-        
+
     return forecastsDict
-    
+
 #%%    
 def forecastProp(forecastsDict, nodes):
     '''
@@ -231,7 +253,7 @@ def forecastProp(forecastsDict, nodes):
             newMat[:,firstNode:lastNode] = np.divide(np.multiply(np.transpose(baseFcst), revTop), foreSum)
             column += 1       
             firstNode += numChild    
-    
+
     return newMat
 
 #%%    
@@ -257,9 +279,9 @@ def optimalComb(forecastsDict, sumMat, method, mse):
         diagMat = [mse[key] for key in mse.keys()]
         diagMat = np.diag(np.flip(np.hstack(diagMat)+0.0000001, 0))
         optiMat = np.dot(np.dot(np.dot(sumMat, np.linalg.inv(np.dot(np.dot(np.transpose(sumMat), np.linalg.inv(diagMat)), sumMat))), np.transpose(sumMat)), np.linalg.inv(diagMat))
-        
+
     newMat = np.empty([hatMat.shape[0],sumMat.shape[0]])
     for i in range(hatMat.shape[0]):
         newMat[i,:] = np.dot(optiMat, np.transpose(hatMat[i,:]))
-        
-    return newMat
+
+    return newMat 
